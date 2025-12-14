@@ -1,25 +1,26 @@
-freetype-sys [![Build Status](https://github.com/PistonDevelopers/freetype-sys/actions/workflows/ci.yml/badge.svg)](https://github.com/PistonDevelopers/freetype-sys/actions/workflows/ci.yml)
-============
+# freetype-sys [![Build Status](https://github.com/PistonDevelopers/freetype-sys/actions/workflows/ci.yml/badge.svg)](https://github.com/PistonDevelopers/freetype-sys/actions)
 
 Low level bindings for the FreeType font library.
 
-# Statically linking against FreeType
+## Statically linking against FreeType
 
-If the `bundled` feature is enabled, `freetype-sys` will build and link a static copy of FreeType. This requires a C compiler. The included version of FreeType is 2.13.2.
+If the `bundled` feature is enabled, `freetype-sys` will build and link a static copy of FreeType. This requires a C compiler. The included version of FreeType is 2.13.3.
 
-```
+```toml
 [dependencies]
-freetype-sys = { version = "0.21", features = ["bundled"] }
+freetype-sys = { version = "0.23", features = ["bundled"] }
 ```
 
-## For Windows users
+### For Windows users
 
-### -pc-windows-gnu
+#### -pc-windows-gnu
+
 In order to easily setup FreeType just get MSYS2 and install either the `mingw-w64-x86_64-freetype` or `mingw-w64-i686-freetype` package and then use Rust from within the correct MinGW shell of MSYS2.
 
 More information on setting up MSYS2 for Rust can be found in [the Rust installing from source document](https://github.com/rust-lang/rust/blob/master/INSTALL.md#building-on-windows).
 
-### -pc-windows-msvc
+#### -pc-windows-msvc
+
 Prebuilt libraries for FreeType are available [here](https://github.com/PistonDevelopers/binaries).
 
 Then in the root of your project, in one of the parent directories, or in your home directory, create a .cargo directory. This directory should contain a `config` file that contains the following snippet:

@@ -8,7 +8,7 @@ If the `bundled` feature is enabled, `freetype-sys` will build and link a static
 
 ```toml
 [dependencies]
-freetype-sys = { version = "0.23", features = ["bundled"] }
+freetype-sys = { version = "0.23.1", features = ["bundled"] }
 ```
 
 ### For Windows users

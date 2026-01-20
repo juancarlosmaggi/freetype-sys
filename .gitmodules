@@ -1,6 +1,6 @@
 [submodule "freetype2"]
     path = freetype2
-    url = https://github.com/freetype/freetype.git
+    url = https://github.com/juancarlosmaggi/freetype.git
 [submodule "libz-sys"]
 	path = libz-sys
 	url = https://github.com/rust-lang/libz-sys.git

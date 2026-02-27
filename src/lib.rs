@@ -1,6 +1,10 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
+#![allow(
+    unpredictable_function_pointer_comparisons,
+    reason = "Generated FFI structs derive Eq/Hash for API parity; pointer identity is not semantically compared in renderer logic."
+)]
 #![deny(missing_copy_implementations)]
 
 use core::ffi::{c_char, c_int, c_long, c_short, c_uchar, c_uint, c_ulong, c_ushort, c_void};

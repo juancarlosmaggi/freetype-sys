@@ -114,12 +114,18 @@ fn main() {
         .file("libpng/pngwutil.c");
 
     let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     if arch == "arm" || arch == "aarch64" {
         build
             .file("libpng/arm/arm_init.c")
             .file("libpng/arm/filter_neon_intrinsics.c")
-            .file("libpng/arm/filter_neon.S")
             .file("libpng/arm/palette_neon_intrinsics.c");
+        // MSVC cannot assemble libpng's GAS filter_neon.S — use C intrinsics only.
+        if target_env == "msvc" {
+            build.define("PNG_ARM_NEON_IMPLEMENTATION", Some("1"));
+        } else {
+            build.file("libpng/arm/filter_neon.S");
+        }
     }
 
     build.compile("libpng.a");

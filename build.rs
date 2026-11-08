@@ -1,5 +1,7 @@
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+
+mod patch;
 
 fn add_sources(build: &mut cc::Build, root: &str, files: &[&str]) {
     let root = std::path::Path::new(root);
@@ -35,65 +37,11 @@ fn patched_cff() -> PathBuf {
     )
     .unwrap();
     let patch = std::fs::read_to_string("patches/share-local-subrs.patch").unwrap();
-    apply_unified(&out, &patch);
+    patch::apply_unified(&out, &patch);
     println!("cargo:rerun-if-changed=patches/share-local-subrs.patch");
     println!("cargo:rerun-if-changed=freetype2/src/cff/cffload.c");
     println!("cargo:rerun-if-changed=freetype2/include/freetype/internal/cfftypes.h");
     out
-}
-
-fn apply_unified(root: &Path, patch: &str) {
-    let mut lines = patch.lines().peekable();
-    let mut path: Option<PathBuf> = None;
-    let mut file = String::new();
-    let finish = |path: &Option<PathBuf>, file: &str| {
-        if let Some(path) = path {
-            std::fs::write(root.join(path), file).unwrap();
-        }
-    };
-    while let Some(line) = lines.next() {
-        if let Some(rest) = line.strip_prefix("+++ b/") {
-            finish(&path, &file);
-            path = Some(PathBuf::from(rest));
-            file = std::fs::read_to_string(root.join(rest))
-                .unwrap_or_else(|err| panic!("reading {}: {}", rest, err));
-            continue;
-        }
-        if !line.starts_with("@@") {
-            continue;
-        }
-        let mut old = String::new();
-        let mut new = String::new();
-        while let Some(next) = lines.peek() {
-            if next.starts_with("@@") || next.starts_with("diff ") || next.starts_with("+++ ") {
-                break;
-            }
-            let hunk = lines.next().unwrap();
-            if hunk.starts_with('\\') {
-                continue;
-            }
-            if let Some(body) = hunk.strip_prefix('+') {
-                new.push_str(body);
-                new.push('\n');
-            } else if let Some(body) = hunk.strip_prefix('-') {
-                old.push_str(body);
-                old.push('\n');
-            } else if let Some(body) = hunk.strip_prefix(' ') {
-                old.push_str(body);
-                old.push('\n');
-                new.push_str(body);
-                new.push('\n');
-            }
-        }
-        let found = file.matches(&old).count();
-        assert_eq!(
-            found, 1,
-            "subroutine-share hunk matched {} times",
-            found
-        );
-        file = file.replacen(&old, &new, 1);
-    }
-    finish(&path, &file);
 }
 
 fn main() {

@@ -1,4 +1,5 @@
 use std::env;
+use std::path::{Path, PathBuf};
 
 fn add_sources(build: &mut cc::Build, root: &str, files: &[&str]) {
     let root = std::path::Path::new(root);
@@ -9,6 +10,90 @@ fn add_sources(build: &mut cc::Build, root: &str, files: &[&str]) {
     }));
 
     build.include(root);
+}
+
+/// Copy the CFF driver and `cfftypes.h` and apply
+/// `patches/share-local-subrs.patch`. Several Font DICTs often name one
+/// local subroutine INDEX. FreeType otherwise allocates that INDEX's offset
+/// table and pointer table once per DICT. The patch loads them once. The
+/// copy is what gets compiled, so the submodule sources stay as published.
+fn patched_cff() -> PathBuf {
+    let out = PathBuf::from(env::var("OUT_DIR").unwrap()).join("ft-share");
+    let cff = out.join("src/cff");
+    let header = out.join("include/freetype/internal");
+    std::fs::create_dir_all(&cff).unwrap();
+    std::fs::create_dir_all(&header).unwrap();
+    for entry in std::fs::read_dir("freetype2/src/cff").unwrap() {
+        let entry = entry.unwrap();
+        if entry.file_type().unwrap().is_file() {
+            std::fs::copy(entry.path(), cff.join(entry.file_name())).unwrap();
+        }
+    }
+    std::fs::copy(
+        "freetype2/include/freetype/internal/cfftypes.h",
+        header.join("cfftypes.h"),
+    )
+    .unwrap();
+    let patch = std::fs::read_to_string("patches/share-local-subrs.patch").unwrap();
+    apply_unified(&out, &patch);
+    println!("cargo:rerun-if-changed=patches/share-local-subrs.patch");
+    println!("cargo:rerun-if-changed=freetype2/src/cff/cffload.c");
+    println!("cargo:rerun-if-changed=freetype2/include/freetype/internal/cfftypes.h");
+    out
+}
+
+fn apply_unified(root: &Path, patch: &str) {
+    let mut lines = patch.lines().peekable();
+    let mut path: Option<PathBuf> = None;
+    let mut file = String::new();
+    let finish = |path: &Option<PathBuf>, file: &str| {
+        if let Some(path) = path {
+            std::fs::write(root.join(path), file).unwrap();
+        }
+    };
+    while let Some(line) = lines.next() {
+        if let Some(rest) = line.strip_prefix("+++ b/") {
+            finish(&path, &file);
+            path = Some(PathBuf::from(rest));
+            file = std::fs::read_to_string(root.join(rest))
+                .unwrap_or_else(|err| panic!("reading {}: {}", rest, err));
+            continue;
+        }
+        if !line.starts_with("@@") {
+            continue;
+        }
+        let mut old = String::new();
+        let mut new = String::new();
+        while let Some(next) = lines.peek() {
+            if next.starts_with("@@") || next.starts_with("diff ") || next.starts_with("+++ ") {
+                break;
+            }
+            let hunk = lines.next().unwrap();
+            if hunk.starts_with('\\') {
+                continue;
+            }
+            if let Some(body) = hunk.strip_prefix('+') {
+                new.push_str(body);
+                new.push('\n');
+            } else if let Some(body) = hunk.strip_prefix('-') {
+                old.push_str(body);
+                old.push('\n');
+            } else if let Some(body) = hunk.strip_prefix(' ') {
+                old.push_str(body);
+                old.push('\n');
+                new.push_str(body);
+                new.push('\n');
+            }
+        }
+        let found = file.matches(&old).count();
+        assert_eq!(
+            found, 1,
+            "subroutine-share hunk matched {} times",
+            found
+        );
+        file = file.replacen(&old, &new, 1);
+    }
+    finish(&path, &file);
 }
 
 fn main() {
@@ -32,10 +117,12 @@ fn main() {
     .unwrap();
 
     let mut build = cc::Build::new();
+    let patched = patched_cff();
 
     build
         .warnings(false)
         .include(".")
+        .include(patched.join("include"))
         .include("freetype2/include")
         .include("libpng")
         .define("FT2_BUILD_LIBRARY", None)
@@ -69,7 +156,6 @@ fn main() {
             "bdf/bdf",
             "bzip2/ftbzip2",
             "cache/ftcache",
-            "cff/cff",
             "cid/type1cid",
             "gzip/ftgzip",
             "lzw/ftlzw",
@@ -89,6 +175,7 @@ fn main() {
             "winfonts/winfnt",
         ],
     );
+    build.file(patched.join("src/cff/cff.c"));
 
     build.compile("freetype2");
 
